@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terry's WebOS Virtual Desktop</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1c1f26 100%);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 頂部引導提示列 */
+    #top-tip-bar {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #e2e8f0;
+      z-index: 999;
+      flex-shrink: 0;
+    }
+    .tip-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lang-switcher-bar {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px;
+      border-radius: 6px;
+    }
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .lang-btn.active {
+      background: #3b82f6;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* 桌面區域 */
+    #desktop {
+      flex: 1;
+      position: relative;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    /* 桌面圖示 */
+    .desktop-icon {
+      width: 84px;
+      padding: 8px 4px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .desktop-icon:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .desktop-icon:active {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .icon-emoji {
+      font-size: 34px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    }
+    .icon-label {
+      font-size: 12px;
+      line-height: 1.3;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+      word-break: break-word;
+    }
+
+    /* 桌面小組件 (Widget) */
+    .desktop-widget {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      background: rgba(20, 22, 30, 0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .widget-time {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      font-family: monospace;
+    }
+    .widget-date {
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    /* 視窗樣式 */
+    .window {
+      position: absolute;
+      background: #1e1e24;
+      border: 1px solid #3c3f4a;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 320px;
+      min-height: 220px;
+    }
+    .window-header {
+      height: 36px;
+      background: #2b2d38;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: move;
+      border-bottom: 1px solid #3c3f4a;
+    }
+    .window-title {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .window-controls {
+      display: flex;
+      gap: 6px;
+    }
+    .win-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .win-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+    .win-btn.close:hover {
+      background: #e81123;
+      color: #fff;
+    }
+    .window-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: text;
+    }
+
+    /* 工具列與表單元件 */
+    .toolbar {
+      background: #252630;
+      padding: 6px 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-bottom: 1px solid #3c3f4a;
+    }
+    .toolbar input, .toolbar select {
+      background: #16171d;
+      border: 1px solid #454854;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      outline: none;
+    }
+    .btn-action {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-action:hover { background: #2563eb; }
+    .btn-secondary {
+      background: #3f4250;
+      color: #fff;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: #525668; }
+
+    /* 記事本 */
+    .notepad-textarea {
+      flex: 1;
+      width: 100%;
+      background: #141519;
+      color: #e2e8f0;
+      border: none;
+      padding: 12px;
+      font-family: Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+    }
+
+    /* 設定面板 */
+    .settings-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      font-size: 13px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .setting-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .setting-group select {
+      padding: 6px;
+      background: #141519;
+      color: #fff;
+      border: 1px solid #454854;
+      border-radius: 4px;
+    }
+    .wallpaper-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .wallpaper-preview {
+      height: 60px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      background-size: cover;
+      background-position: center;
+    }
+    .wallpaper-preview:hover { border-color: #3b82f6; }
+
+    /* 瀏覽器 */
+    .browser-bar {
+      background: #252630;
+      padding: 6px 10px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      border-bottom: 1px solid #3c3f4a;
+    }
+    .browser-url {
+      flex: 1;
+      background: #141519;
+      border: 1px solid #454854;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 16px;
+      font-size: 13px;
+      outline: none;
+    }
+    .browser-bookmarks {
+      background: #1e1f26;
+      padding: 4px 10px;
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      border-bottom: 1px solid #333642;
+      overflow-x: auto;
+    }
+    .bookmark-item {
+      color: #93c5fd;
+      cursor: pointer;
+      white-space: nowrap;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .bookmark-item:hover { background: rgba(147, 197, 253, 0.15); }
+    .browser-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #fff;
+    }
+
+    /* 檔案管理員 */
+    .explorer-list {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .file-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #262833;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .file-row:hover { background: #303341; }
+
+    /* 底部工作列 */
+    #taskbar {
+      height: 44px;
+      background: rgba(20, 22, 29, 0.92);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 9999;
+      flex-shrink: 0;
+    }
+    .taskbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+    }
+    #start-btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #start-btn:hover { background: #1d4ed8; }
+    #taskbar-apps {
+      display: flex;
+      gap: 6px;
+    }
+    .task-item {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border-bottom: 2px solid #3b82f6;
+    }
+    .task-item.minimized {
+      opacity: 0.6;
+      border-bottom-color: transparent;
+    }
+    #clock-display {
+      text-align: right;
+      font-size: 12px;
+      line-height: 1.25;
+      color: #e2e8f0;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    #clock-display:hover { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+    /* 開始選單 */
+    #start-menu {
+      position: absolute;
+      bottom: 50px;
+      left: 12px;
+      width: 240px;
+      background: rgba(30, 32, 42, 0.96);
+      backdrop-filter: blur(12px);
+      border: 1px solid #3c3f4a;
+      border-radius: 8px;
+      padding: 10px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 10000;
+    }
+    .start-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .start-item:hover { background: rgba(255, 255, 255, 0.12); }
+  </style>
+</head>
+<body>
+
+  <input type="file" id="txt-uploader" accept=".txt" style="display:none" />
+  <input type="file" id="bg-uploader" accept="image/*" style="display:none" />
+
+  <!-- 頂部提示列 (含明顯的語言切換選項) -->
+  <div id="top-tip-bar">
+    <div class="tip-left">
+      <span>💡 <span id="tip-text">Tip: Double-click desktop icons to open apps or files. Check 'Instructions.txt' for help!</span></span>
+    </div>
+    <div class="lang-switcher-bar">
+      <button class="lang-btn" id="lang-en" onclick="changeLang('en')">EN</button>
+      <button class="lang-btn" id="lang-tw" onclick="changeLang('zh-TW')">繁中</button>
+      <button class="lang-btn" id="lang-cn" onclick="changeLang('zh-CN')">简体</button>
+    </div>
+  </div>
+
+  <!-- 桌面區域 -->
+  <div id="desktop" onclick="closeStartMenu()">
+    <div class="desktop-widget">
+      <div class="widget-time" id="widget-time">00:00:00</div>
+      <div class="widget-date" id="widget-date">Nov 15, 2026</div>
+    </div>
+  </div>
+
+  <!-- 開始選單 -->
+  <div id="start-menu">
+    <div id="menu-title-header" style="font-size: 12px; color: #94a3b8; padding: 4px 10px; border-bottom: 1px solid #333;">Terry's WebOS</div>
+    <div class="start-item" onclick="openBrowser(); closeStartMenu();"><span id="menu-browser">🌐 Web Browser</span></div>
+    <div class="start-item" onclick="openNotepad(t('newFile') + '.txt', ''); closeStartMenu();"><span id="menu-notepad">📝 Notepad</span></div>
+    <div class="start-item" onclick="triggerUploadTxt(); closeStartMenu();"><span id="menu-upload">📤 Upload TXT</span></div>
+    <div class="start-item" onclick="openExplorer(); closeStartMenu();"><span id="menu-explorer">📁 File Explorer</span></div>
+    <div class="start-item" onclick="openSettings(); closeStartMenu();"><span id="menu-settings">⚙️ Settings & Wallpaper</span></div>
+  </div>
+
+  <!-- 底部工作列 -->
+  <div id="taskbar">
+    <div class="taskbar-left">
+      <button id="start-btn" onclick="toggleStartMenu(event)"><span id="btn-start-text">⊞ Start</span></button>
+      <div id="taskbar-apps"></div>
+    </div>
+    <div id="clock-display" onclick="openSettings()" title="Click to open settings"></div>
+  </div>
+
+  <script>
+    // 1. 多國語言字典 (預設改為英文 en)
+    const i18n = {
+      "en": {
+        tip: "Tip: Double-click desktop icons to open apps or files. Check 'Instructions.txt' for help!",
+        start: "⊞ Start",
+        menuHeader: "Terry's WebOS",
+        browser: "🌐 Web Browser",
+        notepad: "📝 Notepad",
+        upload: "📤 Upload TXT",
+        explorer: "📁 File Explorer",
+        settings: "⚙️ Settings & Wallpaper",
+        newFile: "new_file",
+        saveDesktop: "💾 Save to Desktop",
+        downloadPC: "⬇️ Download to PC",
+        open: "Open",
+        delete: "Delete",
+        confirmDelete: "Are you sure you want to delete '{name}'?",
+        bookmarks: "Bookmarks:",
+        tipBrowser: "Tip: Some websites block embedding due to security policies. Use the bookmarks to test.",
+        settingsTitle: "⚙️ System Settings (Language, Clock & Wallpaper)",
+        languageLabel: "Select Language:",
+        clockModeLabel: "Clock Mode:",
+        autoTime: "🌍 Auto Local Time",
+        manualTime: "🛠️ Manual Timezone",
+        selectTimezone: "Select Timezone:",
+        wallpaperLabel: "Wallpaper Selection:",
+        uploadWallpaper: "🖼️ Upload Custom Wallpaper",
+        savedAlert: "Settings saved!",
+        defaultNotes: {
+          "Instructions.txt": "============================\n       WEBOS USER MANUAL\n============================\n\n1. Desktop Icons: Double-click any icon to open it.\n2. Windows: Drag the title bar to move, minimize or close.\n3. Language Switcher: Located at the top right corner (EN / 繁中 / 简体).\n4. Wallpaper & Clock: Open 'Settings & Wallpaper' from Start menu to customize.\n5. Resume: Check 'Resume.txt' for Terry's personal profile!",
+          "Resume.txt": "============================\n         RESUME / BIO\n============================\n\n[Basic Info]\nName: Terry\nRole: Developer / Student\nInterests: Web Dev, Frontend, Linux\n\n[About Me]\nHello, I'm Terry! This is your personal virtual desktop hosted on GitHub Pages.\nFeel free to edit this file to showcase your projects and skills!\n\n[Skills]\n- HTML5 / CSS3 / JavaScript\n- Git & GitHub Pages\n- UI/UX Design"
+        }
+      },
+      "zh-TW": {
+        tip: "提示：雙擊桌面圖示可開啟應用或檔案。查看「Instructions.txt」了解使用說明！",
+        start: "⊞ 開始",
+        menuHeader: "Terry 的 WebOS",
+        browser: "🌐 網頁瀏覽器",
+        notepad: "📝 記事本",
+        upload: "📤 上傳 TXT",
+        explorer: "📁 檔案管理員",
+        settings: "⚙️ 系統與桌布設定",
+        newFile: "新文件",
+        saveDesktop: "💾 儲存到桌面",
+        downloadPC: "⬇️ 下載到電腦",
+        open: "開啟",
+        delete: "刪除",
+        confirmDelete: "確定要刪除「{name}」嗎？",
+        bookmarks: "書籤：",
+        tipBrowser: "提示：部分網站（如 Google、YouTube）因安全限制會拒絕內嵌，請使用書籤測試。",
+        settingsTitle: "⚙️ 系統設定 (語言、時鐘與桌布)",
+        languageLabel: "選擇系統語言 (Language)：",
+        clockModeLabel: "時鐘模式：",
+        autoTime: "🌍 自動抓取當地時間",
+        manualTime: "🛠️ 手動選擇時區",
+        selectTimezone: "選擇時區：",
+        wallpaperLabel: "自定義桌布選擇：",
+        uploadWallpaper: "🖼️ 上傳自定義桌布圖片",
+        savedAlert: "設定已儲存！",
+        defaultNotes: {
+          "Instructions.txt": "============================\n       WebOS 使用說明書\n============================\n\n1. 桌面圖示：雙擊任意圖示即可開啟應用程式或檔案。\n2. 視窗操作：可拖曳標題列移動位置、最小化或關閉。\n3. 語言切換：位於畫面右上角工具列（可隨時點擊切換 EN/繁中/简体）。\n4. 桌布與時鐘：從「開始」選單開啟「系統設定」進行自定義。\n5. 個人履歷：雙擊「Resume.txt」查看 Terry 的個人簡介！",
+          "Resume.txt": "============================\n       個人履歷 / 簡介\n============================\n\n【基本資料】\n姓名：Terry\n身份：開發者 / 學生\n興趣：網頁開發、前端技術、Linux 系統\n\n【關於我】\n你好，我是 Terry！這是一個部署在 GitHub Pages 上的個人虛擬桌面系統。\n你可以隨時點擊這裡修改內容，記錄你的專案、技能或聯絡方式！\n\n【技能專長】\n- HTML5 / CSS3 / JavaScript\n- Git & GitHub Pages 部署\n- 網頁介面設計"
+        }
+      },
+      "zh-CN": {
+        tip: "提示：双击桌面图标可打开应用或文件。查看「Instructions.txt」了解使用说明！",
+        start: "⊞ 开始",
+        menuHeader: "Terry 的 WebOS",
+        browser: "🌐 网页浏览器",
+        notepad: "📝 记事本",
+        upload: "📤 上传 TXT",
+        explorer: "📁 文件管理器",
+        settings: "⚙️ 系统与壁纸设置",
+        newFile: "新文件",
+        saveDesktop: "💾 保存到桌面",
+        downloadPC: "⬇️ 下载到电脑",
+        open: "打开",
+        delete: "删除",
+        confirmDelete: "确定要删除「{name}」吗？",
+        bookmarks: "书签：",
+        tipBrowser: "提示：部分网站（如 Google、YouTube）因安全限制会拒绝内嵌，请使用书签测试。",
+        settingsTitle: "⚙️ 系统设置 (语言、时钟与壁纸)",
+        languageLabel: "选择系统语言 (Language)：",
+        clockModeLabel: "时钟模式：",
+        autoTime: "🌍 自动获取本地时间",
+        manualTime: "🛠️ 手动选择时区",
+        selectTimezone: "选择时区：",
+        wallpaperLabel: "自定义壁纸选择：",
+        uploadWallpaper: "🖼️ 上传自定义壁纸图片",
+        savedAlert: "设置已保存！",
+        defaultNotes: {
+          "Instructions.txt": "============================\n       WebOS 使用说明书\n============================\n\n1. 桌面图标：双击任意图标即可打开应用程序或文件。\n2. 窗口操作：可拖动标题栏移动位置、最小化或关闭。\n3. 语言切换：位于画面右上角工具栏（可随时点击切换 EN/繁中/简体）。\n4. 壁纸与时钟：从「开始」菜单打开「系统设置」进行自定义。\n5. 个人简历：双击「Resume.txt」查看 Terry 的个人简介！",
+          "Resume.txt": "============================\n       个人简历 / 简介\n============================\n\n【基本资料】\n姓名：Terry\n身份：开发者 / 学生\n兴趣：网页开发、前端技术、Linux 系统\n\n【关于我】\n你好，我是 Terry！这是一个部署在 GitHub Pages 上的个人虚拟桌面系统。\n你可以随时点击这里修改内容，记录你的项目、技能或联系方式！\n\n【技能专长】\n- HTML5 / CSS3 / JavaScript\n- Git & GitHub Pages 部署\n- 网页界面设计"
+        }
+      }
+    };
+
+    // 預設語言改為英文 "en"
+    let currentLang = localStorage.getItem("webos_lang") || "en";
+    let clockMode = localStorage.getItem("webos_clock_mode") || "auto";
+    let selectedTz = localStorage.getItem("webos_tz") || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let currentWallpaper = localStorage.getItem("webos_wallpaper") || "linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1c1f26 100%)";
+
+    function applyWallpaper() {
+      if (currentWallpaper.startsWith("url(") || currentWallpaper.startsWith("data:image")) {
+        document.body.style.background = `url(${currentWallpaper}) no-repeat center center fixed`;
+        document.body.style.backgroundSize = "cover";
+      } else {
+        document.body.style.background = currentWallpaper;
+      }
+    }
+    applyWallpaper();
+
+    function t(key) { return i18n[currentLang][key] || key; }
+
+    let STORAGE_KEY = "webos_txt_files_v6";
+    let files = JSON.parse(localStorage.getItem(STORAGE_KEY)) || i18n[currentLang].defaultNotes;
+
+    function saveState() {
+      localStorage.setItem("webos_lang", currentLang);
+      localStorage.setItem("webos_clock_mode", clockMode);
+      localStorage.setItem("webos_tz", selectedTz);
+      localStorage.setItem("webos_wallpaper", currentWallpaper);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+    }
+
+    function changeLang(lang) {
+      currentLang = lang;
+      saveState();
+      updateUIStrings();
+    }
+
+    // 2. 即時時鐘與 Widget 更新
+    function updateClock() {
+      const now = new Date();
+      let options = { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" };
+      let dateOptions = { year: "numeric", month: "long", day: "numeric", weekday: "short" };
+
+      if (clockMode === "manual" && selectedTz) {
+        options.timeZone = selectedTz;
+        dateOptions.timeZone = selectedTz;
+      }
+
+      try {
+        const timeStr = now.toLocaleTimeString(currentLang === "en" ? "en-US" : currentLang, options);
+        const dateStr = now.toLocaleDateString(currentLang === "en" ? "en-US" : currentLang, dateOptions);
+        
+        document.getElementById("widget-time").textContent = timeStr;
+        document.getElementById("widget-date").textContent = dateStr;
+        document.getElementById("clock-display").innerHTML = `<div>${timeStr}</div><div style="font-size:10px;color:#94a3b8">${dateStr.split(' ')[0]}</div>`;
+      } catch (e) {}
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function updateUIStrings() {
+      document.getElementById("tip-text").textContent = t("tip");
+      document.getElementById("btn-start-text").textContent = t("start");
+      document.getElementById("menu-title-header").textContent = t("menuHeader");
+      document.getElementById("menu-browser").textContent = t("browser");
+      document.getElementById("menu-notepad").textContent = t("notepad");
+      document.getElementById("menu-upload").textContent = t("upload");
+      document.getElementById("menu-explorer").textContent = t("explorer");
+      document.getElementById("menu-settings").textContent = t("settings");
+
+      // 高亮頂部語言按鈕
+      document.querySelectorAll(".lang-btn").forEach(btn => btn.classList.remove("active"));
+      if (currentLang === "en") document.getElementById("lang-en").classList.add("active");
+      if (currentLang === "zh-TW") document.getElementById("lang-tw").classList.add("active");
+      if (currentLang === "zh-CN") document.getElementById("lang-cn").classList.add("active");
+
+      renderDesktopIcons();
+    }
+
+    // 3. 桌面圖示與視窗系統
+    function renderDesktopIcons() {
+      const desktop = document.getElementById("desktop");
+      const widgetHtml = desktop.querySelector(".desktop-widget").outerHTML;
+      desktop.innerHTML = widgetHtml;
+
+      const systemIcons = [
+        { emoji: "🌐", label: t("browser").replace(/^[^\s]+\s/, ""), action: () => openBrowser() },
+        { emoji: "📝", label: t("notepad").replace(/^[^\s]+\s/, ""), action: () => openNotepad(t("newFile") + ".txt", "") },
+        { emoji: "📤", label: t("upload").replace(/^[^\s]+\s/, ""), action: () => triggerUploadTxt() },
+        { emoji: "📁", label: t("explorer").replace(/^[^\s]+\s/, ""), action: () => openExplorer() },
+        { emoji: "⚙️", label: t("settings").replace(/^[^\s]+\s/, ""), action: () => openSettings() }
+      ];
+
+      systemIcons.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "desktop-icon";
+        el.ondblclick = item.action;
+        el.innerHTML = `<div class="icon-emoji">${item.emoji}</div><div class="icon-label">${item.label}</div>`;
+        desktop.appendChild(el);
+      });
+
+      Object.keys(files).forEach(filename => {
+        const el = document.createElement("div");
+        el.className = "desktop-icon";
+        el.ondblclick = () => openNotepad(filename, files[filename]);
+        el.innerHTML = `<div class="icon-emoji">📄</div><div class="icon-label">${escapeHtml(filename)}</div>`;
+        desktop.appendChild(el);
+      });
+    }
+
+    let zIndexCounter = 100;
+    let windowIdCounter = 0;
+    const windows = {};
+
+    function createWindow({ title, width = 560, height = 400, contentHtml }) {
+      const id = "win_" + (++windowIdCounter);
+      const desktop = document.getElementById("desktop");
+
+      const win = document.createElement("div");
+      win.className = "window";
+      win.id = id;
+      win.style.width = width + "px";
+      win.style.height = height + "px";
+      win.style.left = (60 + (windowIdCounter % 6) * 28) + "px";
+      win.style.top = (40 + (windowIdCounter % 6) * 24) + "px";
+      win.style.zIndex = ++zIndexCounter;
+
+      win.onmousedown = () => focusWindow(id);
+
+      win.innerHTML = `
+        <div class="window-header" id="${id}_header">
+          <div class="window-title">${title}</div>
+          <div class="window-controls">
+            <button class="win-btn" onclick="minimizeWindow('${id}')">─</button>
+            <button class="win-btn close" onclick="closeWindow('${id}')">✕</button>
+          </div>
+        </div>
+        <div class="window-body">${contentHtml}</div>
+      `;
+
+      desktop.appendChild(win);
+      windows[id] = { id, title, minimized: false };
+      makeDraggable(win, document.getElementById(`${id}_header`));
+      renderTaskbar();
+      return win;
+    }
+
+    function focusWindow(id) {
+      const win = document.getElementById(id);
+      if (win) {
+        win.style.display = "flex";
+        win.style.zIndex = ++zIndexCounter;
+        windows[id].minimized = false;
+        renderTaskbar();
+      }
+    }
+
+    function minimizeWindow(id) {
+      const win = document.getElementById(id);
+      if (win) {
+        win.style.display = "none";
+        windows[id].minimized = true;
+        renderTaskbar();
+      }
+    }
+
+    function closeWindow(id) {
+      const win = document.getElementById(id);
+      if (win) win.remove();
+      delete windows[id];
+      renderTaskbar();
+    }
+
+    function renderTaskbar() {
+      const container = document.getElementById("taskbar-apps");
+      container.innerHTML = "";
+      Object.values(windows).forEach(w => {
+        const item = document.createElement("div");
+        item.className = "task-item" + (w.minimized ? " minimized" : "");
+        item.textContent = w.title;
+        item.onclick = () => {
+          if (w.minimized) focusWindow(w.id);
+          else minimizeWindow(w.id);
+        };
+        container.appendChild(item);
+      });
+    }
+
+    function makeDraggable(win, header) {
+      let isDragging = false, offsetX = 0, offsetY = 0;
+      header.onmousedown = (e) => {
+        if (e.target.tagName === "BUTTON") return;
+        isDragging = true;
+        offsetX = e.clientX - win.offsetLeft;
+        offsetY = e.clientY - win.offsetTop;
+        focusWindow(win.id);
+      };
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        win.style.left = (e.clientX - offsetX) + "px";
+        win.style.top = Math.max(0, e.clientY - offsetY) + "px";
+      });
+      document.addEventListener("mouseup", () => { isDragging = false; });
+    }
+
+    // 4. 應用程式
+    function openNotepad(filename = "notes.txt", content = "") {
+      const uid = Date.now();
+      createWindow({
+        title: `📝 ${t("notepad")} - ${filename}`,
+        width: 520,
+        height: 380,
+        contentHtml: `
+          <div class="toolbar">
+            <input type="text" id="fname_${uid}" value="${escapeHtml(filename)}" />
+            <button class="btn-action" onclick="saveTxtFile(${uid})">${t("saveDesktop")}</button>
+            <button class="btn-secondary" onclick="downloadTxtFile(${uid})">${t("downloadPC")}</button>
+          </div>
+          <textarea class="notepad-textarea" id="fcontent_${uid}">${escapeHtml(content)}</textarea>
+        `
+      });
+    }
+
+    function saveTxtFile(uid) {
+      let fname = document.getElementById(`fname_${uid}`).value.trim();
+      if (!fname) fname = "unnamed.txt";
+      if (!fname.endsWith(".txt")) fname += ".txt";
+      files[fname] = document.getElementById(`fcontent_${uid}`).value;
+      saveState();
+      renderDesktopIcons();
+      alert(t("savedAlert"));
+    }
+
+    function downloadTxtFile(uid) {
+      let fname = document.getElementById(`fname_${uid}`).value.trim() || "download.txt";
+      if (!fname.endsWith(".txt")) fname += ".txt";
+      const blob = new Blob([document.getElementById(`fcontent_${uid}`).value], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      a.click();
+    }
+
+    function triggerUploadTxt() { document.getElementById("txt-uploader").click(); }
+
+    document.getElementById("txt-uploader").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        files[file.name] = evt.target.result;
+        saveState();
+        renderDesktopIcons();
+        openNotepad(file.name, evt.target.result);
+      };
+      reader.readAsText(file, "UTF-8");
+      e.target.value = "";
+    });
+
+    function openSettings() {
+      const uid = Date.now();
+      createWindow({
+        title: t("settingsTitle"),
+        width: 480,
+        height: 420,
+        contentHtml: `
+          <div class="settings-body">
+            <div class="setting-group">
+              <label>${t("languageLabel")}</label>
+              <select id="lang_select_${uid}">
+                <option value="en" ${currentLang === 'en' ? 'selected' : ''}>English</option>
+                <option value="zh-TW" ${currentLang === 'zh-TW' ? 'selected' : ''}>繁體中文</option>
+                <option value="zh-CN" ${currentLang === 'zh-CN' ? 'selected' : ''}>简体中文</option>
+              </select>
+            </div>
+            <div class="setting-group">
+              <label>${t("clockModeLabel")}</label>
+              <select id="clock_mode_${uid}" onchange="toggleTzSelect(${uid}, this.value)">
+                <option value="auto" ${clockMode === 'auto' ? 'selected' : ''}>${t("autoTime")}</option>
+                <option value="manual" ${clockMode === 'manual' ? 'selected' : ''}>${t("manualTime")}</option>
+              </select>
+            </div>
+            <div class="setting-group" id="tz_group_${uid}" style="display: ${clockMode === 'manual' ? 'flex' : 'none'};">
+              <label>${t("selectTimezone")}</label>
+              <select id="tz_select_${uid}">
+                <option value="Asia/Taipei" ${selectedTz === 'Asia/Taipei' ? 'selected' : ''}>Taipei / Beijing (UTC+8)</option>
+                <option value="Asia/Tokyo" ${selectedTz === 'Asia/Tokyo' ? 'selected' : ''}>Tokyo (UTC+9)</option>
+                <option value="Australia/Sydney" ${selectedTz === 'Australia/Sydney' ? 'selected' : ''}>Sydney (UTC+10)</option>
+                <option value="America/New_York" ${selectedTz === 'America/New_York' ? 'selected' : ''}>New York (EST)</option>
+                <option value="Europe/London" ${selectedTz === 'Europe/London' ? 'selected' : ''}>London (GMT)</option>
+                <option value="UTC" ${selectedTz === 'UTC' ? 'selected' : ''}>UTC</option>
+              </select>
+            </div>
+            <div class="setting-group">
+              <label>${t("wallpaperLabel")}</label>
+              <div class="wallpaper-grid">
+                <div class="wallpaper-preview" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onclick="selectPresetBg('linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)')">Deep Blue</div>
+                <div class="wallpaper-preview" style="background: linear-gradient(135deg, #134e5e 0%, #71b280 100%);" onclick="selectPresetBg('linear-gradient(135deg, #134e5e 0%, #71b280 100%)')">Aurora</div>
+                <div class="wallpaper-preview" style="background: linear-gradient(135deg, #2c3e50 0%, #000000 100%);" onclick="selectPresetBg('linear-gradient(135deg, #2c3e50 0%, #000000 100%)')">Minimal Dark</div>
+                <div class="wallpaper-preview" style="background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);" onclick="selectPresetBg('linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%)')">Sunset</div>
+              </div>
+              <button class="btn-secondary" style="margin-top: 6px; padding: 6px;" onclick="document.getElementById('bg-uploader').click()">${t("uploadWallpaper")}</button>
+            </div>
+            <button class="btn-action" style="margin-top: 10px; padding: 8px;" onclick="saveSettings(${uid})">💾 Save Settings</button>
+          </div>
+        `
+      });
+    }
+
+    function toggleTzSelect(uid, mode) {
+      document.getElementById(`tz_group_${uid}`).style.display = mode === 'manual' ? 'flex' : 'none';
+    }
+
+    function selectPresetBg(bg) {
+      currentWallpaper = bg;
+      applyWallpaper();
+    }
+
+    document.getElementById("bg-uploader").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        currentWallpaper = evt.target.result;
+        applyWallpaper();
+        saveState();
+        alert("Custom wallpaper applied!");
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    });
+
+    function saveSettings(uid) {
+      currentLang = document.getElementById(`lang_select_${uid}`).value;
+      clockMode = document.getElementById(`clock_mode_${uid}`).value;
+      if (clockMode === 'manual') {
+        selectedTz = document.getElementById(`tz_select_${uid}`).value;
+      }
+      saveState();
+      updateUIStrings();
+      alert(t("savedAlert"));
+    }
+
+    function openBrowser(initialUrl = "https://zh.wikipedia.org/wiki/Wikipedia:%E9%A6%96%E9%A1%B5") {
+      const uid = Date.now();
+      createWindow({
+        title: t("browser"),
+        width: 760,
+        height: 500,
+        contentHtml: `
+          <div class="browser-bar">
+            <button class="btn-secondary" onclick="document.getElementById('frame_${uid}').src=document.getElementById('frame_${uid}').src">↻</button>
+            <input type="text" class="browser-url" id="url_${uid}" value="${initialUrl}" onkeydown="if(event.key==='Enter') document.getElementById('frame_${uid}').src=this.value" />
+            <button class="btn-action" onclick="document.getElementById('frame_${uid}').src=document.getElementById('url_${uid}').value">Go</button>
+          </div>
+          <div class="browser-bookmarks">
+            <span style="color:#94a3b8">${t("bookmarks")}</span>
+            <span class="bookmark-item" onclick="setB_url(${uid}, 'https://zh.wikipedia.org/wiki/Wikipedia:%E9%A6%96%E9%A1%B5')">📚 Wikipedia</span>
+            <span class="bookmark-item" onclick="setB_url(${uid}, 'https://www.openstreetmap.org/export/embed.html?bbox=121.50,25.02,121.58,25.06')">🗺️ Map</span>
+            <span class="bookmark-item" onclick="setB_url(${uid}, 'https://example.com')">🔗 Example</span>
+          </div>
+          <div style="background:#332b00; color:#fde047; font-size:11px; padding:3px 10px;">${t("tipBrowser")}</div>
+          <iframe class="browser-frame" id="frame_${uid}" src="${initialUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        `
+      });
+    }
+
+    function setB_url(uid, url) {
+      document.getElementById(`url_${uid}`).value = url;
+      document.getElementById(`frame_${uid}`).src = url;
+    }
+
+    function openExplorer() {
+      const uid = Date.now();
+      createWindow({
+        title: t("explorer"),
+        width: 460,
+        height: 340,
+        contentHtml: `
+          <div class="toolbar">
+            <button class="btn-action" onclick="triggerUploadTxt()">${t("upload")}</button>
+            <button class="btn-secondary" onclick="openNotepad(t('newFile')+'.txt', '')">➕ ${t("notepad")}</button>
+          </div>
+          <div class="explorer-list" id="explorer_${uid}"></div>
+        `
+      });
+      refreshExplorer(uid);
+    }
+
+    function refreshExplorer(uid) {
+      const container = document.getElementById(`explorer_${uid}`);
+      if (!container) return;
+      container.innerHTML = "";
+      Object.keys(files).forEach(fname => {
+        const row = document.createElement("div");
+        row.className = "file-row";
+        row.innerHTML = `
+          <span>📄 ${escapeHtml(fname)}</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-action" onclick="openNotepad('${escapeHtml(fname)}', files['${escapeHtml(fname)}'])">${t("open")}</button>
+            <button class="btn-secondary" style="background:#dc2626" onclick="deleteTxt('${escapeHtml(fname)}', ${uid})">${t("delete")}</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function deleteTxt(fname, uid) {
+      if (confirm(t("confirmDelete").replace("{name}", fname))) {
+        delete files[fname];
+        saveState();
+        refreshExplorer(uid);
+        renderDesktopIcons();
+      }
+    }
+
+    function toggleStartMenu(e) {
+      e.stopPropagation();
+      const menu = document.getElementById("start-menu");
+      menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+    }
+
+    function closeStartMenu() {
+      document.getElementById("start-menu").style.display = "none";
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    updateUIStrings();
+  </script>
+</body>
+</html>
